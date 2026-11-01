@@ -7,7 +7,12 @@ import streamlit as st
 # --------------------------------------------------
 # 리눅스 서버(Streamlit Cloud) 한글 폰트 설정 (최상단 고정)
 # --------------------------------------------------
-font_path = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+# 나눔고딕 폰트 캐시 강제 갱신 및 설정
+plt.rcParams["font.family"] = "NanumGothic"
+plt.rcParams["axes.unicode_minus"] = False
+
+# 만약 캐시 문제로 폰트가 안 잡힐 경우를 대비한 폰트 리셋
+fm._load_fontmanager(try_read_cache=False)
 
 try:
   font_name = fm.FontProperties(fname=font_path).get_name()
