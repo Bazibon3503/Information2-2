@@ -7,23 +7,16 @@ import streamlit as st
 # --------------------------------------------------
 # 리눅스 서버(Streamlit Cloud) 한글 폰트 설정 (최상단 고정)
 # --------------------------------------------------
-# 나눔고딕 폰트 캐시 강제 갱신 및 설정
 plt.rcParams["font.family"] = "NanumGothic"
 plt.rcParams["axes.unicode_minus"] = False
 
-# 만약 캐시 문제로 폰트가 안 잡힐 경우를 대비한 폰트 리셋
-fm._load_fontmanager(try_read_cache=False)
-
 try:
-  font_name = fm.FontProperties(fname=font_path).get_name()
-  plt.rcParams["font.family"] = font_name
+  fm._load_fontmanager(try_read_cache=False)
 except Exception:
-  plt.rcParams["font.family"] = "sans-serif"
-
-plt.rcParams["axes.unicode_minus"] = False
+  pass
 
 st.set_page_config(
-    page_title="수능 예측 분석", page_icon="📊", layout="wide"
+    page_title="고2 성적으로 수능 예상하기", page_icon="📊", layout="wide"
 )
 
 SUBJECTS = ["국어", "수학", "영어", "탐구1", "탐구2"]
@@ -130,14 +123,7 @@ def calculate_base_english(grades):
 
 def predict_percentile(base, grad_share, grad_advantage, growth, subject):
   """국어, 수학, 탐구 백분위 예측"""
-  if base >= 90:
-    factor = 1.0
-  elif base >= 80:
-    factor = 1.0
-  else:
-    factor = 1.0
-
-  competition_penalty = grad_share * grad_advantage * factor
+  competition_penalty = grad_share * grad_advantage
   predicted = base + growth - competition_penalty
 
   return max(0.0, min(100.0, predicted))
@@ -150,7 +136,7 @@ def predict_english(base_score, growth_english):
 
 
 # --------------------------------------------------
-# 메인UI 시작
+# 메인 UI 시작
 # --------------------------------------------------
 
 st.title("📊 고2 성적으로 수능 예상하기")
@@ -162,12 +148,11 @@ st.write(
 
 st.warning(
     "이 프로그램은 실제 수능 결과로 검증된 예측 모델이 아닙니다. "
-    "가중치, 재수생 경쟁 압력 및 향후 실력 변화는 사용자가 설정한"
-    " 가정입니다."
+    "가중치, 재수생 경쟁 압력 및 향후 실력 변화는 사용자가 설정한 가정입니다."
 )
 
 # --------------------------------------------------
-# 1. 성적 입력
+# 1. 성적 입력 및 가정 설정
 # --------------------------------------------------
 
 st.header("1. 고2 모의고사 성적 입력")
@@ -187,7 +172,6 @@ with st.form("score_form"):
     for i, subject in enumerate(SUBJECTS):
       with cols[i]:
         if subject == "영어":
-          # 영어는 등급 선택 Box
           grade = st.selectbox(
               f"{subject} (등급)",
               ["미응시"] + list(range(1, 10)),
@@ -195,7 +179,6 @@ with st.form("score_form"):
           )
           scores[exam][subject] = None if grade == "미응시" else grade
         else:
-          # 국/수/탐은 백분위 Number Input
           val = st.number_input(
               f"{subject} (백분위 %)",
               min_value=0.0,
@@ -215,9 +198,12 @@ with st.form("score_form"):
           "졸업생·검정고시 등 응시자 비율 (%)",
           min_value=0,
           max_value=50,
-          value=33,
+          value=29,
           step=1,
-          help="2026학년도 실제 비율을 참고한 기본값입니다.",
+          help=(
+              "역대 수능 개편 분석 및 2026학년도 실제 비율(29%)을 반영한"
+              " 기본값입니다."
+          ),
       )
       / 100
   )
@@ -228,7 +214,10 @@ with st.form("score_form"):
       max_value=20,
       value=10,
       step=1,
-      help="재수생이 현재 학생보다 상대적으로 강하다는 가정입니다.",
+      help=(
+          "표준점수만으로는 평균 백분율을 구하기 어려워 진학사 관련 입시"
+          " 자료를 참고하여 설정한 값입니다."
+      ),
   )
 
   growth_mid = st.slider(
@@ -237,19 +226,15 @@ with st.form("score_form"):
       max_value=10,
       value=0,
       step=1,
-      help=(
-          "공부량, 약점 보완 및 시험 적응에 따른 가상의 변화를"
-          " 설정합니다."
-      ),
+      help="공부량, 약점 보완 및 시험 적응에 따른 가상의 변화를 설정합니다.",
   )
 
   submitted = st.form_submit_button(
       "수능 예상 성적 계산", type="primary", use_container_width=True
   )
 
-
 # --------------------------------------------------
-# 2. 예측 계산
+# 2. 예측 계산 및 결과 출력
 # --------------------------------------------------
 
 if submitted:
@@ -299,9 +284,7 @@ if submitted:
       predicted_p = predict_percentile(
           base=base_p,
           grad_share=grad_share,
-          grad_advantage=(
-              grad_advantage * setting["advantage_multiplier"]
-          ),
+          grad_advantage=(grad_advantage * setting["advantage_multiplier"]),
           growth=growth_mid + setting["growth_delta"],
           subject=subject,
       )
@@ -327,7 +310,7 @@ if submitted:
     )
 
     # ------------------------------------------
-    # 3. 시나리오별 백분위/등급 그래프
+    # 4. 시나리오별 백분위/등급 그래프
     # ------------------------------------------
 
     st.header("4. 시나리오별 예상 백분위 비교 (영어는 예상 점수)")
@@ -354,7 +337,7 @@ if submitted:
                 base_score=base_score,
                 growth_english=growth_mid + setting["growth_delta"],
             )
-            values.append(p_score)  # 영어는 예상 점수로 표시
+            values.append(p_score)
           else:
             base = base_values[subject]
             p = predict_percentile(
@@ -366,7 +349,7 @@ if submitted:
                 growth=growth_mid + setting["growth_delta"],
                 subject=subject,
             )
-            values.append(p)  # 국/수/탐은 백분위 수치로 표시
+            values.append(p)
 
         rects = ax.bar(
             x + (i - 1) * width,
@@ -404,7 +387,7 @@ if submitted:
       plt.close(fig)
 
     # ------------------------------------------
-    # 4. 입력 성적 확인 및 다운로드
+    # 5. 입력 성적 확인 및 다운로드
     # ------------------------------------------
 
     st.header("5. 입력한 모의고사 성적")
